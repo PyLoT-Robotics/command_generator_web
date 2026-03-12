@@ -1,0 +1,251 @@
+:root {
+  --bg: #f6f1e8;
+  --bg-gradient-1: #f9edd6;
+  --bg-gradient-2: #d9ebff;
+  --surface: #fffdf8;
+  --text: #1f2a37;
+  --muted: #4c5a67;
+  --accent: #006d77;
+  --accent-strong: #004f58;
+  --line: #c7d3db;
+  --success: #157f1f;
+  --shadow: 0 24px 60px rgba(14, 45, 64, 0.15);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Lexend", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 15% 10%, var(--bg-gradient-1) 0%, transparent 45%),
+    radial-gradient(circle at 85% 95%, var(--bg-gradient-2) 0%, transparent 42%),
+    var(--bg);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.app-shell {
+  width: min(840px, 100%);
+  display: grid;
+  gap: 20px;
+  animation: slide-in 420ms ease-out;
+}
+
+.hero,
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in hsl, var(--surface), white 18%);
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  padding: 22px;
+}
+
+.hero-kicker {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hero h1 {
+  margin: 8px 0 10px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.7rem, 4vw, 2.45rem);
+  line-height: 1.1;
+}
+
+.hero-sub {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.panel {
+  padding: 20px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.mode-select,
+.generate-btn,
+.ghost-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.mode-select {
+  padding: 10px 12px;
+  background: #ffffff;
+  margin-bottom: 12px;
+}
+
+.generate-btn {
+  border: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, #008c99 100%);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.generate-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(0, 109, 119, 0.28);
+}
+
+.generate-btn:active {
+  transform: translateY(0);
+}
+
+.ghost-btn {
+  margin-top: 10px;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.action-row .ghost-btn {
+  margin-top: 0;
+}
+
+.voice-settings {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfeff;
+  overflow: hidden;
+}
+
+.voice-settings summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: var(--accent-strong);
+}
+
+.voice-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.voice-grid {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.mini-label {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.mini-select,
+.rate-range {
+  width: 100%;
+}
+
+.mini-select {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  background: #ffffff;
+  font-family: inherit;
+}
+
+.status-wrap {
+  margin-top: 14px;
+}
+
+.status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  background: #e5edf3;
+  color: #2b3f4f;
+}
+
+.status.loading {
+  background: #f9e7c7;
+  color: #6d4d00;
+}
+
+.status.ok {
+  background: #dbf5e0;
+  color: var(--success);
+}
+
+.status.error {
+  background: #ffd9d9;
+  color: #8f1d1d;
+}
+
+.result {
+  margin: 14px 0 0;
+  padding: 14px;
+  border-radius: 14px;
+  min-height: 180px;
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid #d6e0e7;
+  background: #f9fcff;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+}
+
+@media (min-width: 768px) {
+  .panel {
+    padding: 24px;
+  }
+
+  .generate-btn,
+  .ghost-btn,
+  .mode-select,
+  .action-row,
+  .voice-settings {
+    max-width: 460px;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

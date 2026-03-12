@@ -1,0 +1,3 @@
+[submodule "CommandGeneratorJP"]
+	path = CommandGeneratorJP
+	url = https://github.com/RoboCupAtHomeJP/CommandGeneratorJP

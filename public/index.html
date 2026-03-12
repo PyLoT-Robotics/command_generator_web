@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>RCJ Command Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="hero-kicker">RoboCup At Home</p>
+      <h1>Command Generator</h1>
+      <p class="hero-sub">公式生成ロジックをWebから即実行。スマホでも1タップでコマンド生成できます。</p>
+    </section>
+
+    <section class="panel">
+      <label for="mode" class="label">生成モード</label>
+      <select id="mode" class="mode-select">
+        <option value="any">1: Any command</option>
+        <option value="people">2: Command without manipulation</option>
+        <option value="objects">3: Command with manipulation</option>
+        <option value="batch">4: Batch of three commands</option>
+        <option value="egpsr">5: Generate EGPSR setup</option>
+      </select>
+
+      <button id="generateBtn" class="generate-btn" type="button">Generate</button>
+      <div class="action-row">
+        <button id="copyBtn" class="ghost-btn" type="button">Copy Result</button>
+        <button id="speakBtn" class="ghost-btn" type="button">Speak</button>
+      </div>
+
+      <details class="voice-settings" id="voiceSettings">
+        <summary>Voice Settings</summary>
+        <div class="voice-grid">
+          <label for="voiceSelect" class="mini-label">Voice</label>
+          <select id="voiceSelect" class="mini-select"></select>
+
+          <label for="rateRange" class="mini-label">Speed: <span id="rateValue">1.00</span>x</label>
+          <input id="rateRange" class="rate-range" type="range" min="0.6" max="1.6" step="0.05" value="1.0">
+        </div>
+      </details>
+
+      <div class="status-wrap">
+        <span id="statusBadge" class="status">Ready</span>
+      </div>
+
+      <pre id="result" class="result" aria-live="polite">ここに生成結果が表示されます。</pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
