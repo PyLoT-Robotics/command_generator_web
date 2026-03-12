@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import urlopen
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 COMMAND_GENERATOR_REPO_DIR = ROOT_DIR / "CommandGenerator"
@@ -128,6 +128,127 @@ def _load_generator_classes() -> tuple[Any, Any]:
     return gpsr_module.CommandGenerator, egpsr_module.EgpsrCommandGenerator
 
 app = Flask(__name__, static_folder=str(ROOT_DIR / "public"), static_url_path="")
+
+
+EMBEDDED_STYLE = """
+:root { --bg:#f6f1e8; --surface:#fffdf8; --text:#1f2a37; --muted:#4c5a67; --accent:#006d77; --line:#c7d3db; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg); display:grid; place-items:center; padding:20px; }
+.app { width:min(820px,100%); border:1px solid var(--line); border-radius:18px; background:var(--surface); padding:18px; }
+h1 { margin:0 0 8px; font-size:1.6rem; }
+p { margin:0 0 14px; color:var(--muted); }
+select, button { width:100%; min-height:44px; border-radius:10px; border:1px solid var(--line); font-size:1rem; }
+button { cursor:pointer; }
+.primary { border:0; background:var(--accent); color:#fff; font-weight:700; margin-top:10px; }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.result { margin-top:12px; min-height:160px; border:1px solid var(--line); border-radius:10px; background:#f9fcff; padding:12px; white-space:pre-wrap; line-height:1.55; font-family:ui-monospace,Consolas,monospace; }
+.status { margin-top:10px; color:var(--muted); font-size:.9rem; }
+details { margin-top:10px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+label { display:block; margin:.4rem 0; font-size:.9rem; color:var(--muted); }
+"""
+
+EMBEDDED_SCRIPT = """
+const modeEl = document.getElementById('mode');
+const resultEl = document.getElementById('result');
+const statusEl = document.getElementById('status');
+const generateBtn = document.getElementById('generateBtn');
+const copyBtn = document.getElementById('copyBtn');
+const speakBtn = document.getElementById('speakBtn');
+const voiceSelect = document.getElementById('voiceSelect');
+const rateRange = document.getElementById('rateRange');
+const rateValue = document.getElementById('rateValue');
+
+const speechSupported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+let voices = [];
+
+if (!speechSupported) {
+    speakBtn.disabled = true;
+    voiceSelect.disabled = true;
+    rateRange.disabled = true;
+}
+
+function setStatus(text) { statusEl.textContent = text; }
+
+function loadVoices() {
+    if (!speechSupported) return;
+    voices = speechSynthesis.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang)).slice(0, 8);
+    voiceSelect.innerHTML = '';
+    if (!voices.length) {
+        const op = document.createElement('option');
+        op.value = ''; op.textContent = 'English Default'; voiceSelect.appendChild(op); return;
+    }
+    voices.forEach((v, i) => {
+        const op = document.createElement('option');
+        op.value = v.name; op.textContent = `${v.name} (${v.lang})`; if (i === 0) op.selected = true;
+        voiceSelect.appendChild(op);
+    });
+}
+
+async function generateCommand() {
+    setStatus('Generating...');
+    generateBtn.disabled = true;
+    try {
+        const res = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mode: modeEl.value }) });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error || 'Generation failed');
+        resultEl.textContent = payload.text || 'No result';
+        setStatus('Done');
+    } catch (e) {
+        resultEl.textContent = `Error: ${e.message}`;
+        setStatus('Error');
+    } finally {
+        generateBtn.disabled = false;
+    }
+}
+
+async function copyResult() {
+    const text = resultEl.textContent.trim();
+    if (!text || text.includes('ここに生成結果')) return;
+    try { await navigator.clipboard.writeText(text); setStatus('Copied'); } catch { setStatus('Copy failed'); }
+}
+
+function speakResult() {
+    if (!speechSupported) { setStatus('Speech not supported'); return; }
+    const text = resultEl.textContent.trim();
+    if (!text || text.includes('ここに生成結果')) { setStatus('No text'); return; }
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); speakBtn.textContent = 'Speak'; setStatus('Stopped'); return; }
+    const ut = new SpeechSynthesisUtterance(text);
+    ut.rate = Number(rateRange.value);
+    ut.lang = 'en-US';
+    const voice = voices.find(v => v.name === voiceSelect.value);
+    if (voice) { ut.voice = voice; ut.lang = voice.lang; }
+    ut.onstart = () => { speakBtn.textContent = 'Stop'; setStatus('Speaking...'); };
+    ut.onend = () => { speakBtn.textContent = 'Speak'; setStatus('Done speaking'); };
+    ut.onerror = () => { speakBtn.textContent = 'Speak'; setStatus('Speech failed'); };
+    speechSynthesis.speak(ut);
+}
+
+rateRange.addEventListener('input', () => { rateValue.textContent = Number(rateRange.value).toFixed(2); });
+generateBtn.addEventListener('click', generateCommand);
+copyBtn.addEventListener('click', copyResult);
+speakBtn.addEventListener('click', speakResult);
+if (speechSupported) {
+    loadVoices();
+    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+}
+"""
+
+EMBEDDED_INDEX_HTML = f"""
+<!doctype html>
+<html lang=\"ja\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>RCJ Command Generator</title>
+<style>{EMBEDDED_STYLE}</style></head><body>
+<main class=\"app\">
+<h1>Command Generator</h1>
+<p>Vercel fallback UI (mobile friendly)</p>
+<select id=\"mode\"><option value=\"any\">1: Any command</option><option value=\"people\">2: Without manipulation</option><option value=\"objects\">3: With manipulation</option><option value=\"batch\">4: Batch of three</option><option value=\"egpsr\">5: EGPSR setup</option></select>
+<button id=\"generateBtn\" class=\"primary\" type=\"button\">Generate</button>
+<div class=\"row\"><button id=\"copyBtn\" type=\"button\">Copy Result</button><button id=\"speakBtn\" type=\"button\">Speak</button></div>
+<details><summary>Voice Settings</summary><label for=\"voiceSelect\">Voice</label><select id=\"voiceSelect\"></select><label for=\"rateRange\">Speed: <span id=\"rateValue\">1.00</span>x</label><input id=\"rateRange\" type=\"range\" min=\"0.6\" max=\"1.6\" step=\"0.05\" value=\"1.0\"></details>
+<div id=\"status\" class=\"status\">Ready</div>
+<pre id=\"result\" class=\"result\">ここに生成結果が表示されます。</pre>
+</main>
+<script>{EMBEDDED_SCRIPT}</script></body></html>
+"""
 
 
 
@@ -284,7 +405,10 @@ def generate() -> tuple[object, int]:
 
 @app.get("/")
 def root():
-    return app.send_static_file("index.html")
+    index_file = ROOT_DIR / "public" / "index.html"
+    if index_file.exists():
+        return app.send_static_file("index.html")
+    return Response(EMBEDDED_INDEX_HTML, mimetype="text/html")
 
 
 @app.get("/<path:asset_path>")
@@ -292,7 +416,7 @@ def static_assets(asset_path: str):
     asset_file = ROOT_DIR / "public" / asset_path
     if asset_file.exists() and asset_file.is_file():
         return app.send_static_file(asset_path)
-    return app.send_static_file("index.html")
+    return Response(EMBEDDED_INDEX_HTML, mimetype="text/html")
 
 
 if __name__ == "__main__":
