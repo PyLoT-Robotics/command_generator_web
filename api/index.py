@@ -159,7 +159,26 @@ const rateRange = document.getElementById('rateRange');
 const rateValue = document.getElementById('rateValue');
 
 const speechSupported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
-let voices = [];
+let cleanEnglishVoices = [];
+const presetVoiceMap = new Map();
+
+const VOICE_PRESETS = [
+    { id: 'devis', label: 'devis', keywords: ['devis', 'davis', 'guy', 'daniel', 'arthur'] },
+    { id: 'ryan', label: 'ryan', keywords: ['ryan', 'george', 'liam', 'james'] },
+    { id: 'andrew', label: 'andrew', keywords: ['andrew', 'christopher', 'mark', 'brian'] },
+    { id: 'david', label: 'david', keywords: ['microsoft david', 'david', 'alex'] },
+    { id: 'aria', label: 'aria', keywords: ['aria', 'samantha', 'jenny', 'emma'] },
+    { id: 'natasha', label: 'natasha', keywords: ['natasha', 'ava', 'olivia', 'victoria'] },
+    { id: 'susan', label: 'susan', keywords: ['susan', 'michelle', 'karen', 'allison', 'joanna'] },
+    { id: 'zira', label: 'zira', keywords: ['microsoft zira', 'zira', 'serena'] }
+];
+
+const BAD_VOICE_NAME_PATTERN = /whisper|novelty|robot|child|kid|silly|bells|boing|trinoids|bad news|hysterical|sing/i;
+const STORAGE_KEYS = { rate: 'cg_voice_rate', voice: 'cg_voice_preset' };
+
+const initialRate = Number(localStorage.getItem(STORAGE_KEYS.rate) || '1.0');
+rateRange.value = String(Number.isFinite(initialRate) ? initialRate : 1.0);
+rateValue.textContent = Number(rateRange.value).toFixed(2);
 
 if (!speechSupported) {
     speakBtn.disabled = true;
@@ -169,18 +188,42 @@ if (!speechSupported) {
 
 function setStatus(text) { statusEl.textContent = text; }
 
+function findPresetVoice(preset, voices, usedVoiceNames) {
+    const lowerKeywords = preset.keywords.map((k) => k.toLowerCase());
+    const direct = voices.find((v) => {
+        const name = v.name.toLowerCase();
+        return !usedVoiceNames.has(name) && lowerKeywords.some((k) => name.includes(k));
+    });
+    if (direct) return direct;
+    return voices.find((v) => !usedVoiceNames.has(v.name.toLowerCase())) || null;
+}
+
 function loadVoices() {
-    if (!speechSupported) return;
-    voices = speechSynthesis.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang)).slice(0, 8);
+        if (!speechSupported) {
+            return;
+        }
+
+        cleanEnglishVoices = speechSynthesis.getVoices().filter((v) => {
+            return /^en([-_]|$)/i.test(v.lang) && !BAD_VOICE_NAME_PATTERN.test(v.name);
+        });
+
+        presetVoiceMap.clear();
+        const usedVoiceNames = new Set();
+
+        VOICE_PRESETS.forEach((preset) => {
+            const match = findPresetVoice(preset, cleanEnglishVoices, usedVoiceNames);
+            presetVoiceMap.set(preset.id, match);
+            if (match) usedVoiceNames.add(match.name.toLowerCase());
+        });
+
     voiceSelect.innerHTML = '';
-    if (!voices.length) {
-        const op = document.createElement('option');
-        op.value = ''; op.textContent = 'English Default'; voiceSelect.appendChild(op); return;
-    }
-    voices.forEach((v, i) => {
-        const op = document.createElement('option');
-        op.value = v.name; op.textContent = `${v.name} (${v.lang})`; if (i === 0) op.selected = true;
-        voiceSelect.appendChild(op);
+        const savedPreset = localStorage.getItem(STORAGE_KEYS.voice) || 'aria';
+        VOICE_PRESETS.forEach((preset, i) => {
+            const op = document.createElement('option');
+            op.value = preset.id;
+            op.textContent = preset.label;
+            if (preset.id === savedPreset || (!savedPreset && i === 0)) op.selected = true;
+            voiceSelect.appendChild(op);
     });
 }
 
@@ -215,7 +258,8 @@ function speakResult() {
     const ut = new SpeechSynthesisUtterance(text);
     ut.rate = Number(rateRange.value);
     ut.lang = 'en-US';
-    const voice = voices.find(v => v.name === voiceSelect.value);
+        const selectedPresetId = voiceSelect.value;
+        const voice = presetVoiceMap.get(selectedPresetId) || cleanEnglishVoices[0] || null;
     if (voice) { ut.voice = voice; ut.lang = voice.lang; }
     ut.onstart = () => { speakBtn.textContent = 'Stop'; setStatus('Speaking...'); };
     ut.onend = () => { speakBtn.textContent = 'Speak'; setStatus('Done speaking'); };
@@ -223,7 +267,12 @@ function speakResult() {
     speechSynthesis.speak(ut);
 }
 
-rateRange.addEventListener('input', () => { rateValue.textContent = Number(rateRange.value).toFixed(2); });
+rateRange.addEventListener('input', () => {
+    const r = Number(rateRange.value);
+    rateValue.textContent = r.toFixed(2);
+    localStorage.setItem(STORAGE_KEYS.rate, String(r));
+});
+voiceSelect.addEventListener('change', () => { localStorage.setItem(STORAGE_KEYS.voice, voiceSelect.value); });
 generateBtn.addEventListener('click', generateCommand);
 copyBtn.addEventListener('click', copyResult);
 speakBtn.addEventListener('click', speakResult);

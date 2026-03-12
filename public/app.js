@@ -9,11 +9,25 @@ const rateRange = document.getElementById("rateRange");
 const rateValue = document.getElementById("rateValue");
 
 const speechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
-let availableVoices = [];
+let cleanEnglishVoices = [];
+const presetVoiceMap = new Map();
+
+const VOICE_PRESETS = [
+  { id: "devis", label: "devis", keywords: ["devis", "davis", "guy", "daniel", "arthur"] },
+  { id: "ryan", label: "ryan", keywords: ["ryan", "george", "liam", "james"] },
+  { id: "andrew", label: "andrew", keywords: ["andrew", "christopher", "mark", "brian"] },
+  { id: "david", label: "david", keywords: ["microsoft david", "david", "alex"] },
+  { id: "aria", label: "aria", keywords: ["aria", "samantha", "jenny", "emma"] },
+  { id: "natasha", label: "natasha", keywords: ["natasha", "ava", "olivia", "victoria"] },
+  { id: "susan", label: "susan", keywords: ["susan", "michelle", "karen", "allison", "joanna"] },
+  { id: "zira", label: "zira", keywords: ["microsoft zira", "zira", "serena"] }
+];
+
+const BAD_VOICE_NAME_PATTERN = /whisper|novelty|robot|child|kid|silly|bells|boing|trinoids|bad news|hysterical|sing/i;
 
 const STORAGE_KEYS = {
   rate: "cg_voice_rate",
-  voice: "cg_voice_name"
+  voice: "cg_voice_preset"
 };
 
 const initialRate = Number(localStorage.getItem(STORAGE_KEYS.rate) || "1.0");
@@ -27,36 +41,52 @@ if (!speechSupported) {
   rateRange.disabled = true;
 }
 
+function findPresetVoice(preset, voices, usedVoiceNames) {
+  const lowerKeywords = preset.keywords.map((keyword) => keyword.toLowerCase());
+  const directMatch = voices.find((voice) => {
+    const name = voice.name.toLowerCase();
+    return !usedVoiceNames.has(name) && lowerKeywords.some((keyword) => name.includes(keyword));
+  });
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  return voices.find((voice) => !usedVoiceNames.has(voice.name.toLowerCase())) || null;
+}
+
 function loadVoices() {
   if (!speechSupported) {
     return;
   }
 
   const allVoices = window.speechSynthesis.getVoices();
-  const englishVoices = allVoices.filter((voice) => /^en([-_]|$)/i.test(voice.lang));
+  cleanEnglishVoices = allVoices.filter((voice) => {
+    return /^en([-_]|$)/i.test(voice.lang) && !BAD_VOICE_NAME_PATTERN.test(voice.name);
+  });
 
-  // Keep the selector compact on mobile by exposing only a small English-only set.
-  availableVoices = englishVoices.slice(0, 8);
+  presetVoiceMap.clear();
+  const usedVoiceNames = new Set();
+
+  VOICE_PRESETS.forEach((preset) => {
+    const matchedVoice = findPresetVoice(preset, cleanEnglishVoices, usedVoiceNames);
+    presetVoiceMap.set(preset.id, matchedVoice);
+    if (matchedVoice) {
+      usedVoiceNames.add(matchedVoice.name.toLowerCase());
+    }
+  });
+
   voiceSelect.innerHTML = "";
 
-  if (!availableVoices.length) {
+  const savedPreset = localStorage.getItem(STORAGE_KEYS.voice) || "aria";
+  VOICE_PRESETS.forEach((preset, index) => {
     const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "English Default";
-    voiceSelect.appendChild(option);
-    return;
-  }
-
-  const savedVoiceName = localStorage.getItem(STORAGE_KEYS.voice) || "";
-
-  availableVoices.forEach((voice, index) => {
-    const option = document.createElement("option");
-    option.value = voice.name;
-    option.textContent = `${voice.name} (${voice.lang})`;
-    if (voice.name === savedVoiceName) {
+    option.value = preset.id;
+    option.textContent = preset.label;
+    if (preset.id === savedPreset) {
       option.selected = true;
     }
-    if (!savedVoiceName && index === 0) {
+    if (!savedPreset && index === 0) {
       option.selected = true;
     }
     voiceSelect.appendChild(option);
@@ -139,8 +169,8 @@ function speakResult() {
   utterance.rate = Number(rateRange.value);
   utterance.pitch = 1.0;
 
-  const selectedVoiceName = voiceSelect.value;
-  const selectedVoice = availableVoices.find((voice) => voice.name === selectedVoiceName);
+  const selectedPresetId = voiceSelect.value;
+  const selectedVoice = presetVoiceMap.get(selectedPresetId) || cleanEnglishVoices[0] || null;
   if (selectedVoice) {
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang;
