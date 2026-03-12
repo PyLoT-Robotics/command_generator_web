@@ -62,23 +62,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-3. `CommandGenerator` 本体を用意
-
-このリポジトリに `CommandGenerator/` が存在しない場合のみ実行してください。
+3. サブモジュールを取得
 
 ```powershell
-git clone --branch rcj25_for_opl https://github.com/RoboCupAtHomeJP/CommandGenerator.git CommandGenerator
-```
-
-4. `CommandGeneratorJP` サブモジュールを取得
-
-```powershell
-cd CommandGenerator
 git submodule update --init --recursive
-cd ..
 ```
 
-5. 起動
+4. 起動
 
 ```powershell
 python api\index.py
@@ -90,29 +80,19 @@ python api\index.py
 
 upstream に更新が入ったら、以下で取り込みます。
 
-1. `CommandGenerator` を更新
-
-```powershell
-cd CommandGenerator
-git fetch origin
-git checkout rcj25_for_opl
-git pull origin rcj25_for_opl
-```
-
-2. `CommandGeneratorJP` サブモジュールを更新
+1. `CommandGenerator` サブモジュール参照を更新
 
 ```powershell
 git submodule update --init --recursive --remote
-cd ..
 ```
 
-3. Web 側の動作確認
+2. Web 側の動作確認
 
 ```powershell
 python api\index.py
 ```
 
-4. 問題なければ GitHub へ反映
+3. 問題なければ GitHub へ反映
 
 - このリポジトリ管理方法に合わせて、更新分を commit/push してください。
 - その後 Vercel を再デプロイすると最新データが反映されます。
