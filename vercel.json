@@ -2,11 +2,7 @@
   "functions": {
     "api/index.py": {
       "includeFiles": [
-        "public/**",
-        "CommandGenerator/names/**",
-        "CommandGenerator/maps/**",
-        "CommandGenerator/objects/**",
-        "CommandGenerator/CommandGeneratorJP/**"
+        "public/**"
       ]
     }
   },
