@@ -1,9 +1,7 @@
 {
   "functions": {
     "api/index.py": {
-      "includeFiles": [
-        "public/**"
-      ]
+      "includeFiles": "public/**"
     }
   },
   "routes": [
