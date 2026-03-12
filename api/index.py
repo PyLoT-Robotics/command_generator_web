@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import io
 import importlib
 import random
 import re
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import urlopen
 
+import qrcode
 from flask import Flask, Response, jsonify, request
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -140,11 +142,14 @@ p { margin:0 0 14px; color:var(--muted); }
 select, button { width:100%; min-height:44px; border-radius:10px; border:1px solid var(--line); font-size:1rem; }
 button { cursor:pointer; }
 .primary { border:0; background:var(--accent); color:#fff; font-weight:700; margin-top:10px; }
-.row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
 .result { margin-top:12px; min-height:160px; border:1px solid var(--line); border-radius:10px; background:#f9fcff; padding:12px; white-space:pre-wrap; line-height:1.55; font-family:ui-monospace,Consolas,monospace; }
 .status { margin-top:10px; color:var(--muted); font-size:.9rem; }
 details { margin-top:10px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
 label { display:block; margin:.4rem 0; font-size:.9rem; color:var(--muted); }
+.qr { margin-top:12px; border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px; display:grid; justify-items:center; gap:8px; }
+.qr img { width:min(220px,74vw); aspect-ratio:1/1; border:1px solid var(--line); border-radius:8px; background:#fff; }
+.qr a { color:var(--accent); font-weight:600; text-decoration:none; }
 """
 
 EMBEDDED_SCRIPT = """
@@ -154,6 +159,10 @@ const statusEl = document.getElementById('status');
 const generateBtn = document.getElementById('generateBtn');
 const copyBtn = document.getElementById('copyBtn');
 const speakBtn = document.getElementById('speakBtn');
+const qrBtn = document.getElementById('qrBtn');
+const qrSection = document.getElementById('qrSection');
+const qrImage = document.getElementById('qrImage');
+const qrDownload = document.getElementById('qrDownload');
 const voiceSelect = document.getElementById('voiceSelect');
 const rateRange = document.getElementById('rateRange');
 const rateValue = document.getElementById('rateValue');
@@ -250,6 +259,29 @@ async function copyResult() {
     try { await navigator.clipboard.writeText(text); setStatus('Copied'); } catch { setStatus('Copy failed'); }
 }
 
+async function showQrCode() {
+    const text = resultEl.textContent.trim();
+    if (!text || text.includes('ここに生成結果')) { setStatus('No text for QR'); return; }
+    qrBtn.disabled = true;
+    setStatus('Generating QR...');
+    try {
+        const res = await fetch(`/api/qrcode?text=${encodeURIComponent(text)}`);
+        if (!res.ok) throw new Error('QR generation failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        if (qrImage.dataset.url) URL.revokeObjectURL(qrImage.dataset.url);
+        qrImage.src = url;
+        qrImage.dataset.url = url;
+        qrDownload.href = url;
+        qrSection.hidden = false;
+        setStatus('QR ready');
+    } catch {
+        setStatus('QR failed');
+    } finally {
+        qrBtn.disabled = false;
+    }
+}
+
 function speakResult() {
     if (!speechSupported) { setStatus('Speech not supported'); return; }
     const text = resultEl.textContent.trim();
@@ -276,6 +308,7 @@ voiceSelect.addEventListener('change', () => { localStorage.setItem(STORAGE_KEYS
 generateBtn.addEventListener('click', generateCommand);
 copyBtn.addEventListener('click', copyResult);
 speakBtn.addEventListener('click', speakResult);
+qrBtn.addEventListener('click', showQrCode);
 if (speechSupported) {
     loadVoices();
     speechSynthesis.addEventListener('voiceschanged', loadVoices);
@@ -291,10 +324,11 @@ EMBEDDED_INDEX_HTML = f"""
 <p>Vercel fallback UI (mobile friendly)</p>
 <select id=\"mode\"><option value=\"any\">1: Any command</option><option value=\"people\">2: Without manipulation</option><option value=\"objects\">3: With manipulation</option><option value=\"batch\">4: Batch of three</option><option value=\"egpsr\">5: EGPSR setup</option></select>
 <button id=\"generateBtn\" class=\"primary\" type=\"button\">Generate</button>
-<div class=\"row\"><button id=\"copyBtn\" type=\"button\">Copy Result</button><button id=\"speakBtn\" type=\"button\">Speak</button></div>
+<div class=\"row\"><button id=\"copyBtn\" type=\"button\">Copy Result</button><button id=\"speakBtn\" type=\"button\">Speak</button><button id=\"qrBtn\" type=\"button\">Show QR</button></div>
 <details><summary>Voice Settings</summary><label for=\"voiceSelect\">Voice</label><select id=\"voiceSelect\"></select><label for=\"rateRange\">Speed: <span id=\"rateValue\">1.00</span>x</label><input id=\"rateRange\" type=\"range\" min=\"0.6\" max=\"1.6\" step=\"0.05\" value=\"1.0\"></details>
 <div id=\"status\" class=\"status\">Ready</div>
 <pre id=\"result\" class=\"result\">ここに生成結果が表示されます。</pre>
+<section id=\"qrSection\" class=\"qr\" hidden><img id=\"qrImage\" alt=\"Generated QR code\"><a id=\"qrDownload\" download=\"command_qr.png\">Download QR</a></section>
 </main>
 <script>{EMBEDDED_SCRIPT}</script></body></html>
 """
@@ -450,6 +484,36 @@ def generate() -> tuple[object, int]:
         return jsonify({"error": str(error)}), 500
     except Exception as error:
         return jsonify({"error": f"Unexpected generator error: {error}"}), 500
+
+
+@app.route("/api/qrcode", methods=["GET", "POST"])
+def generate_qrcode():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        text = str(payload.get("text", "")).strip()
+    else:
+        text = str(request.args.get("text", "")).strip()
+
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 2500:
+        return jsonify({"error": "text is too long"}), 400
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(text)
+    qr.make(fit=True)
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+
+    png_buffer = io.BytesIO()
+    qr_image.save(png_buffer, format="PNG")
+    png_buffer.seek(0)
+
+    return Response(png_buffer.getvalue(), mimetype="image/png")
 
 
 @app.get("/")

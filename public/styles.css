@@ -127,7 +127,7 @@ body {
 
 .action-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
@@ -222,6 +222,35 @@ body {
   white-space: pre-wrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.95rem;
+}
+
+.qr-section {
+  margin-top: 14px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d6e0e7;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.qr-image {
+  width: min(240px, 78vw);
+  aspect-ratio: 1 / 1;
+  border: 1px solid #d6e0e7;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.qr-download {
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.qr-download:hover {
+  text-decoration: underline;
 }
 
 @media (min-width: 768px) {

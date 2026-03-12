@@ -4,6 +4,10 @@ const statusBadge = document.getElementById("statusBadge");
 const generateBtn = document.getElementById("generateBtn");
 const copyBtn = document.getElementById("copyBtn");
 const speakBtn = document.getElementById("speakBtn");
+const qrBtn = document.getElementById("qrBtn");
+const qrSection = document.getElementById("qrSection");
+const qrImage = document.getElementById("qrImage");
+const qrDownload = document.getElementById("qrDownload");
 const voiceSelect = document.getElementById("voiceSelect");
 const rateRange = document.getElementById("rateRange");
 const rateValue = document.getElementById("rateValue");
@@ -145,6 +149,41 @@ async function copyResult() {
   }
 }
 
+async function showQrCode() {
+  const text = resultEl.textContent.trim();
+  if (!text || text === "ここに生成結果が表示されます。") {
+    setStatus("No text for QR", "error");
+    return;
+  }
+
+  qrBtn.disabled = true;
+  setStatus("Generating QR...", "loading");
+
+  try {
+    const response = await fetch(`/api/qrcode?text=${encodeURIComponent(text)}`);
+    if (!response.ok) {
+      throw new Error("QR generation failed");
+    }
+
+    const imageBlob = await response.blob();
+    const imageUrl = URL.createObjectURL(imageBlob);
+
+    if (qrImage.dataset.url) {
+      URL.revokeObjectURL(qrImage.dataset.url);
+    }
+
+    qrImage.src = imageUrl;
+    qrImage.dataset.url = imageUrl;
+    qrDownload.href = imageUrl;
+    qrSection.hidden = false;
+    setStatus("QR ready", "ok");
+  } catch (_error) {
+    setStatus("QR failed", "error");
+  } finally {
+    qrBtn.disabled = false;
+  }
+}
+
 function speakResult() {
   if (!speechSupported) {
     setStatus("Speech not supported", "error");
@@ -212,3 +251,4 @@ if (speechSupported) {
 generateBtn.addEventListener("click", generateCommand);
 copyBtn.addEventListener("click", copyResult);
 speakBtn.addEventListener("click", speakResult);
+qrBtn.addEventListener("click", showQrCode);

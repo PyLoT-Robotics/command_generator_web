@@ -31,6 +31,7 @@
       <div class="action-row">
         <button id="copyBtn" class="ghost-btn" type="button">Copy Result</button>
         <button id="speakBtn" class="ghost-btn" type="button">Speak</button>
+        <button id="qrBtn" class="ghost-btn" type="button">Show QR</button>
       </div>
 
       <details class="voice-settings" id="voiceSettings">
@@ -49,6 +50,10 @@
       </div>
 
       <pre id="result" class="result" aria-live="polite">ここに生成結果が表示されます。</pre>
+      <section id="qrSection" class="qr-section" hidden>
+        <img id="qrImage" class="qr-image" alt="Generated QR code">
+        <a id="qrDownload" class="qr-download" download="command_qr.png">Download QR</a>
+      </section>
     </section>
   </main>
 
