@@ -1,4 +1,4 @@
 [submodule "CommandGenerator"]
 	path = CommandGenerator
-	url = https://github.com/RoboCupAtHomeJP/CommandGenerator.git
-	branch = rcj25_for_opl
+	url = https://github.com/RoboCupAtHome/CommandGenerator.git
+	branch = master

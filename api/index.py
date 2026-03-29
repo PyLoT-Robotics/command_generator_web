@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import io
 import importlib
+import inspect
 import random
 import re
 import shutil
@@ -18,29 +19,50 @@ from flask import Flask, Response, jsonify, request
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 COMMAND_GENERATOR_REPO_DIR = ROOT_DIR / "CommandGenerator"
-COMMAND_GENERATOR_JP_DIR = COMMAND_GENERATOR_REPO_DIR / "CommandGeneratorJP"
+CANDIDATE_DATA_DIRS = [
+    ROOT_DIR,
+    ROOT_DIR / "CompetitionTemplate",
+    ROOT_DIR / "data",
+    COMMAND_GENERATOR_REPO_DIR,
+]
 CACHE_ROOT_DIR = Path(tempfile.gettempdir()) / "command_generator_web_cache"
 
-COMMAND_GENERATOR_BRANCH = "rcj25_for_opl"
+COMMAND_GENERATOR_BRANCH = "master"
 COMMAND_GENERATOR_REPO_ZIP_URL = (
-    f"https://codeload.github.com/RoboCupAtHomeJP/CommandGenerator/zip/refs/heads/{COMMAND_GENERATOR_BRANCH}"
+    f"https://codeload.github.com/RoboCupAtHome/CommandGenerator/zip/refs/heads/{COMMAND_GENERATOR_BRANCH}"
 )
-COMMAND_GENERATOR_JP_ZIP_URLS = [
-    "https://codeload.github.com/RoboCupAtHomeJP/CommandGeneratorJP/zip/refs/heads/main",
-    "https://codeload.github.com/RoboCupAtHomeJP/CommandGeneratorJP/zip/refs/heads/master",
-]
+COMPETITION_TEMPLATE_ZIP_URL = "https://codeload.github.com/RoboCupAtHome/CompetitionTemplate/zip/refs/heads/main"
 
 
-def _required_data_files_exist(repo_dir: Path, jp_dir: Path) -> bool:
+def _required_generator_files_exist(generator_root: Path) -> bool:
+    module_dir = generator_root / "src" / "robocupathome_generator"
+    legacy_dir = generator_root / "CommandGeneratorJP"
+    return (
+        (module_dir / "gpsr_commands.py").exists() and (module_dir / "egpsr_commands.py").exists()
+    ) or ((legacy_dir / "gpsr_commands.py").exists() and (legacy_dir / "egpsr_commands.py").exists())
+
+
+def _find_objects_file(data_dir: Path) -> Path | None:
+    for candidate in (data_dir / "objects" / "objects.md", data_dir / "objects" / "object_names.md"):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _required_data_files_exist(data_dir: Path) -> bool:
     required_paths = [
-        repo_dir / "names" / "names.md",
-        repo_dir / "maps" / "location_names.md",
-        repo_dir / "maps" / "room_names.md",
-        repo_dir / "objects" / "object_names.md",
-        jp_dir / "gpsr_commands.py",
-        jp_dir / "egpsr_commands.py",
+        data_dir / "names" / "names.md",
+        data_dir / "maps" / "location_names.md",
+        data_dir / "maps" / "room_names.md",
     ]
-    return all(path.exists() for path in required_paths)
+    return all(path.exists() for path in required_paths) and _find_objects_file(data_dir) is not None
+
+
+def _find_data_dir() -> Path | None:
+    for data_dir in CANDIDATE_DATA_DIRS:
+        if _required_data_files_exist(data_dir):
+            return data_dir
+    return None
 
 
 def _extract_zip_bytes(zip_bytes: bytes, output_dir: Path) -> None:
@@ -68,63 +90,62 @@ def _download_zip(url: str) -> bytes:
 
 def _prepare_fallback_sources() -> tuple[Path, Path]:
     repo_cache = CACHE_ROOT_DIR / "CommandGenerator"
-    jp_cache = CACHE_ROOT_DIR / "CommandGeneratorJP"
+    data_cache = CACHE_ROOT_DIR / "CompetitionTemplate"
     prepared_marker = CACHE_ROOT_DIR / ".prepared"
 
     if prepared_marker.exists():
-        repo_dir = repo_cache / "repo"
-        jp_dir = jp_cache / "repo"
-        if _required_data_files_exist(repo_dir, jp_dir):
-            return repo_dir, jp_dir
+        generator_dir = repo_cache / "repo"
+        data_dir = data_cache / "repo"
+        if _required_generator_files_exist(generator_dir) and _required_data_files_exist(data_dir):
+            return generator_dir, data_dir
 
     repo_zip = _download_zip(COMMAND_GENERATOR_REPO_ZIP_URL)
     _extract_zip_bytes(repo_zip, repo_cache)
     extracted_repo_root = _first_dir(repo_cache)
-    repo_dir = repo_cache / "repo"
-    if repo_dir.exists():
-        shutil.rmtree(repo_dir)
-    extracted_repo_root.rename(repo_dir)
+    generator_dir = repo_cache / "repo"
+    if generator_dir.exists():
+        shutil.rmtree(generator_dir)
+    extracted_repo_root.rename(generator_dir)
 
-    jp_dir = jp_cache / "repo"
-    jp_download_error: Exception | None = None
-    for jp_url in COMMAND_GENERATOR_JP_ZIP_URLS:
-        try:
-            jp_zip = _download_zip(jp_url)
-            _extract_zip_bytes(jp_zip, jp_cache)
-            extracted_jp_root = _first_dir(jp_cache)
-            if jp_dir.exists():
-                shutil.rmtree(jp_dir)
-            extracted_jp_root.rename(jp_dir)
-            jp_download_error = None
-            break
-        except Exception as error:  # pragma: no cover - network dependent branch
-            jp_download_error = error
-
-    if jp_download_error is not None:
-        raise RuntimeError("Failed to download CommandGeneratorJP fallback source") from jp_download_error
+    data_zip = _download_zip(COMPETITION_TEMPLATE_ZIP_URL)
+    _extract_zip_bytes(data_zip, data_cache)
+    extracted_data_root = _first_dir(data_cache)
+    data_dir = data_cache / "repo"
+    if data_dir.exists():
+        shutil.rmtree(data_dir)
+    extracted_data_root.rename(data_dir)
 
     prepared_marker.write_text("ok", encoding="utf-8")
 
-    if not _required_data_files_exist(repo_dir, jp_dir):
+    if not _required_generator_files_exist(generator_dir) or not _required_data_files_exist(data_dir):
         raise RuntimeError("Fallback sources are incomplete after download")
 
-    return repo_dir, jp_dir
+    return generator_dir, data_dir
 
 
 @functools.lru_cache(maxsize=1)
 def _resolve_source_dirs() -> tuple[Path, Path]:
-    if _required_data_files_exist(COMMAND_GENERATOR_REPO_DIR, COMMAND_GENERATOR_JP_DIR):
-        return COMMAND_GENERATOR_REPO_DIR, COMMAND_GENERATOR_JP_DIR
+    data_dir = _find_data_dir()
+    if _required_generator_files_exist(COMMAND_GENERATOR_REPO_DIR) and data_dir is not None:
+        return COMMAND_GENERATOR_REPO_DIR, data_dir
     return _prepare_fallback_sources()
 
 
 @functools.lru_cache(maxsize=1)
 def _load_generator_classes() -> tuple[Any, Any]:
-    _, jp_dir = _resolve_source_dirs()
+    generator_dir, _ = _resolve_source_dirs()
 
-    if str(jp_dir) not in sys.path:
-        sys.path.insert(0, str(jp_dir))
+    modern_src_dir = generator_dir / "src"
+    if modern_src_dir.exists():
+        if str(modern_src_dir) not in sys.path:
+            sys.path.insert(0, str(modern_src_dir))
+        gpsr_module = importlib.import_module("robocupathome_generator.gpsr_commands")
+        egpsr_module = importlib.import_module("robocupathome_generator.egpsr_commands")
+        return gpsr_module.CommandGenerator, egpsr_module.EgpsrCommandGenerator
 
+    legacy_module_dir = generator_dir / "CommandGeneratorJP"
+    if str(legacy_module_dir) not in sys.path:
+        sys.path.insert(0, str(legacy_module_dir))
     gpsr_module = importlib.import_module("gpsr_commands")
     egpsr_module = importlib.import_module("egpsr_commands")
     return gpsr_module.CommandGenerator, egpsr_module.EgpsrCommandGenerator
@@ -398,15 +419,16 @@ def _safe_generate_command(generator: Any, category: str) -> str:
 
 @functools.lru_cache(maxsize=1)
 def _build_generators() -> tuple[Any, Any]:
-    repo_dir, _ = _resolve_source_dirs()
+    _, data_dir = _resolve_source_dirs()
     CommandGenerator, EgpsrCommandGenerator = _load_generator_classes()
+    objects_file = _find_objects_file(data_dir)
+    if objects_file is None:
+        raise RuntimeError("Objects file was not found in the configured data directory")
 
-    names = _parse_names(_read_data(repo_dir / "names" / "names.md"))
-    locations, placement_locations = _parse_locations(_read_data(repo_dir / "maps" / "location_names.md"))
-    rooms = _parse_rooms(_read_data(repo_dir / "maps" / "room_names.md"))
-    objects, categories_plural, categories_singular = _parse_objects(
-        _read_data(repo_dir / "objects" / "object_names.md")
-    )
+    names = _parse_names(_read_data(data_dir / "names" / "names.md"))
+    locations, placement_locations = _parse_locations(_read_data(data_dir / "maps" / "location_names.md"))
+    rooms = _parse_rooms(_read_data(data_dir / "maps" / "room_names.md"))
+    objects, categories_plural, categories_singular = _parse_objects(_read_data(objects_file))
 
     generator = CommandGenerator(
         names,
@@ -447,7 +469,14 @@ def _generate(mode: str) -> dict[str, object]:
         return {"mode": mode, "commands": commands, "text": "\n".join(commands)}
 
     if mode == "egpsr":
-        setup = egpsr_generator.generate_setup().strip()
+        generate_setup = egpsr_generator.generate_setup
+        params = inspect.signature(generate_setup).parameters
+        setup_raw = generate_setup(3) if len(params) >= 1 else generate_setup()
+        if isinstance(setup_raw, list):
+            tasks = [str(getattr(task, "task", task)).strip() for task in setup_raw]
+            tasks = [task for task in tasks if task]
+            return {"mode": mode, "commands": tasks, "text": "\n".join(tasks)}
+        setup = str(setup_raw).strip()
         return {"mode": mode, "commands": [setup], "text": setup}
 
     raise ValueError(f"Unsupported mode: {mode}")
@@ -456,9 +485,14 @@ def _generate(mode: str) -> dict[str, object]:
 @app.get("/api/health")
 def health() -> tuple[dict[str, str], int]:
     try:
-        repo_dir, jp_dir = _resolve_source_dirs()
-        source = "submodule" if repo_dir == COMMAND_GENERATOR_REPO_DIR else "fallback-download"
-        return {"status": "ok", "generator_source": source, "repo_dir": str(repo_dir), "jp_dir": str(jp_dir)}, 200
+        generator_dir, data_dir = _resolve_source_dirs()
+        source = "submodule" if generator_dir == COMMAND_GENERATOR_REPO_DIR else "fallback-download"
+        return {
+            "status": "ok",
+            "generator_source": source,
+            "generator_dir": str(generator_dir),
+            "data_dir": str(data_dir),
+        }, 200
     except Exception as error:
         return {"status": "degraded", "error": str(error)}, 200
 

@@ -1,6 +1,6 @@
 # Command Generator Web (Vercel + Python)
 
-RoboCupAtHomeJP の `CommandGenerator`（`rcj25_for_opl`）を Web UI から実行するプロジェクトです。
+RoboCupAtHome の `CommandGenerator`（`master`）を Web UI から実行するプロジェクトです。
 
 - Backend: Flask (`api/index.py`)
 - Frontend: Vanilla HTML/CSS/JS (`public/`)
@@ -25,8 +25,9 @@ RoboCupAtHomeJP の `CommandGenerator`（`rcj25_for_opl`）を Web UI から実�
 
 補足:
 
-- 元の実体は `generate.py` ではなく `CommandGeneratorJP/generator.py` です。
+- 生成ロジックは `CommandGenerator/src/robocupathome_generator/` を利用します。
 - upstream の既知不整合で `WARNING` が出るケースがあるため、API 側で再抽選しています。
+- データは `names/maps/objects` を探索し、見つからない場合は `CompetitionTemplate` をフォールバック取得します。
 
 ## GitHub へ上げて Vercel にデプロイ
 
