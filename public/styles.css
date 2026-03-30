@@ -75,7 +75,7 @@ body {
 .source-note {
   margin: 8px 0 0;
   font-size: 0.74rem;
-  color: var(--muted);
+  color: #2f3f4c;
   line-height: 1.4;
 }
 

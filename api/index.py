@@ -160,6 +160,8 @@ body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,Segoe UI,
 .app { width:min(820px,100%); border:1px solid var(--line); border-radius:18px; background:var(--surface); padding:18px; }
 h1 { margin:0 0 8px; font-size:1.6rem; }
 p { margin:0 0 14px; color:var(--muted); }
+.source-note { margin:0 0 14px; font-size:.75rem; color:#2f3f4c; line-height:1.35; }
+.source-note a { color:inherit; text-decoration-thickness:1px; text-underline-offset:2px; }
 select, button { width:100%; min-height:44px; border-radius:10px; border:1px solid var(--line); font-size:1rem; }
 button { cursor:pointer; }
 .primary { border:0; background:var(--accent); color:#fff; font-weight:700; margin-top:10px; }
@@ -342,7 +344,7 @@ EMBEDDED_INDEX_HTML = f"""
 <style>{EMBEDDED_STYLE}</style></head><body>
 <main class=\"app\">
 <h1>Command Generator</h1>
-<p>Vercel fallback UI (mobile friendly)</p>
+<p class=\"source-note\">Source: <a href=\"https://github.com/RoboCupAtHome/CommandGenerator.git\" target=\"_blank\" rel=\"noopener noreferrer\">https://github.com/RoboCupAtHome/CommandGenerator.git</a></p>
 <select id=\"mode\"><option value=\"any\">1: Any command</option><option value=\"people\">2: Without manipulation</option><option value=\"objects\">3: With manipulation</option><option value=\"batch\">4: Batch of three</option><option value=\"egpsr\">5: EGPSR setup</option></select>
 <button id=\"generateBtn\" class=\"primary\" type=\"button\">Generate</button>
 <div class=\"row\"><button id=\"copyBtn\" type=\"button\">Copy Result</button><button id=\"speakBtn\" type=\"button\">Speak</button><button id=\"qrBtn\" type=\"button\">Show QR</button></div>
