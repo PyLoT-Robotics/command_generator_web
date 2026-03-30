@@ -72,6 +72,19 @@ body {
   line-height: 1.55;
 }
 
+.source-note {
+  margin: 8px 0 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.source-note a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .panel {
   padding: 20px;
 }
