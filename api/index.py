@@ -403,6 +403,58 @@ def _parse_objects(data: str) -> tuple[list[str], list[str], list[str]]:
     return parsed_objects, plural, singular
 
 
+def _build_knowledge(
+    data_dir: Path,
+    names: list[str],
+    locations: list[str],
+    placement_locations: list[str],
+    rooms: list[str],
+    objects: list[str],
+    categories_plural: list[str],
+    categories_singular: list[str],
+):
+    try:
+        from robocupathome_generator import knowledge as knowledge_module
+
+        parse_data = getattr(knowledge_module, "parse_data", None)
+        if callable(parse_data):
+            try:
+                return parse_data(str(data_dir))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    class _SimpleKnowledge:
+        def __init__(
+            self,
+            names: list[str],
+            locations: list[str],
+            placement_locations: list[str],
+            rooms: list[str],
+            objects: list[str],
+            categories_plural: list[str],
+            categories_singular: list[str],
+        ) -> None:
+            self.names = names
+            self.locations = locations
+            self.placement_locations = placement_locations
+            self.rooms = rooms
+            self.objects = objects
+            self.object_categories_plural = categories_plural
+            self.object_categories_singular = categories_singular
+
+    return _SimpleKnowledge(
+        names,
+        locations,
+        placement_locations,
+        rooms,
+        objects,
+        categories_plural,
+        categories_singular,
+    )
+
+
 
 def _capitalize_first(text: str) -> str:
     text = text.strip()
@@ -432,15 +484,33 @@ def _build_generators() -> tuple[Any, Any]:
     rooms = _parse_rooms(_read_data(data_dir / "maps" / "room_names.md"))
     objects, categories_plural, categories_singular = _parse_objects(_read_data(objects_file))
 
-    generator = CommandGenerator(
-        names,
-        locations,
-        placement_locations,
-        rooms,
-        objects,
-        categories_plural,
-        categories_singular,
-    )
+    init_params = [
+        param
+        for param in inspect.signature(CommandGenerator.__init__).parameters.values()
+        if param.name != "self"
+    ]
+    if len(init_params) == 1:
+        knowledge = _build_knowledge(
+            data_dir,
+            names,
+            locations,
+            placement_locations,
+            rooms,
+            objects,
+            categories_plural,
+            categories_singular,
+        )
+        generator = CommandGenerator(knowledge)
+    else:
+        generator = CommandGenerator(
+            names,
+            locations,
+            placement_locations,
+            rooms,
+            objects,
+            categories_plural,
+            categories_singular,
+        )
     egpsr_generator = EgpsrCommandGenerator(generator)
     return generator, egpsr_generator
 
